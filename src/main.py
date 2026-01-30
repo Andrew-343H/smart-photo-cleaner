@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from loguru import logger
 
-from utils.utils import fetch_user_dir, found_images_list, move_to_folder
+from utils.utils import fetch_user_dir, found_images_list, add_more, move_to_folder
 
 
 class YoloAnalysis():
@@ -71,16 +71,35 @@ class YoloAnalysis():
 
 
 def main():
-    input_dir = fetch_user_dir("Select main folder")
-    if input_dir:
-        filelist = found_images_list(input_dir)
-        # Find the folder in which is contained the model
-        ROOT = Path(__file__).resolve().parents[1]
-        MODEL_PATH = ROOT / "training_models" / "yolo11x.pt"
+    filelist = []
+    first_folder = None
+    selected_dirs = set()
+    
+    while True:
+        input_dir = fetch_user_dir("Select main folder")
+        if not input_dir:
+            break
+        if first_folder is None:
+            first_folder = input_dir
+        # Canonical path
+        input_dir = input_dir.resolve()
+        if input_dir in selected_dirs:
+            logger.warning("Folder already selected, skipping.")
+            continue
 
-        model = YOLO(MODEL_PATH)
-        obj = YoloAnalysis(filelist, model)
-        imgs_list = obj.run_analysis()
+        selected_dirs.add(input_dir)
+        filelist.extend(found_images_list(input_dir))
+        
+        if not add_more():
+            break
+
+    # Find the folder in which is contained the model
+    ROOT = Path(__file__).resolve().parents[1]
+    MODEL_PATH = ROOT / "training_models" / "yolo11x.pt"
+
+    model = YOLO(MODEL_PATH)
+    obj = YoloAnalysis(filelist, model)
+    imgs_list = obj.run_analysis()
 
     out_title = "Select where the photo will be stored"
     while True:
@@ -89,7 +108,7 @@ def main():
             break
         logger.error("User didn't choose a folder, retry")
     
-    move_to_folder(input_dir, out_dir, imgs_list)
+    move_to_folder(first_folder, out_dir, imgs_list)
 
 
 if __name__ == "__main__":

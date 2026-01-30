@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import shutil
 from pathlib import Path
 from loguru import logger
@@ -35,14 +35,19 @@ def found_images_list(root:Path) -> list:
     image_exts = (".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")
 
     found_images = []
-    for root, _, files in root.walk():
+    for dirpath, _, files in root.walk():
         for file in files:
             if file.lower().endswith(image_exts):
-                path = root / file
+                path = dirpath / file
                 if path.is_file():
                     found_images.append(path)
 
     return found_images
+
+def add_more():
+    message="Do you want to select other folder?"
+    result = messagebox.askyesno("Add more", message)
+    return result
 
 
 def move_to_folder(
