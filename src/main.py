@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from loguru import logger
 
-from utils.utils import fetch_input_dir, found_images_list
+from utils.utils import fetch_user_dir, found_images_list, move_to_folder
 
 
 class YoloAnalysis():
@@ -62,26 +62,34 @@ class YoloAnalysis():
         target_list = []
         for img_path in self.imgs_paths:
             has_target = self.prediction(
-                img_path, person_class_id, show=True,
+                img_path, person_class_id, show=False,
             )
             if has_target:
                 target_list.append(img_path)
-        
+        logger.success('Classification finished')
         return target_list
 
 
-
 def main():
-    selected_dir = fetch_input_dir()
-    if selected_dir:
-        filelist = found_images_list(selected_dir)
+    input_dir = fetch_user_dir("Select main folder")
+    if input_dir:
+        filelist = found_images_list(input_dir)
         # Find the folder in which is contained the model
         ROOT = Path(__file__).resolve().parents[1]
         MODEL_PATH = ROOT / "training_models" / "yolo11x.pt"
 
         model = YOLO(MODEL_PATH)
         obj = YoloAnalysis(filelist, model)
-        imgs_list = obj.run_analysis()        
+        imgs_list = obj.run_analysis()
+
+    out_title = "Select where the photo will be stored"
+    while True:
+        out_dir = fetch_user_dir(out_title)
+        if out_dir is not None:
+            break
+        logger.error("User didn't choose a folder, retry")
+    
+    move_to_folder(input_dir, out_dir, imgs_list)
 
 
 if __name__ == "__main__":
