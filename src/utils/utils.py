@@ -3,6 +3,8 @@ from tkinter import filedialog, messagebox
 import shutil
 from pathlib import Path
 from loguru import logger
+import yaml
+import sys
 
 
 def fetch_user_dir(title:str, base_directory:Path=Path.home()):
@@ -76,3 +78,48 @@ def move_to_folder(
         shutil.copy2(path, target)
         path.replace(img_to_bin)
     logger.success('All images moved')
+
+
+def extract_config(config_name: str, same_lv: bool = False) -> dict:
+    """
+    Load configuration data from a configuration file.
+    Params:
+    - config_name: the name of yaml file
+    - samelv: identify if it belongs to folder name Risorse or to main folder
+    """
+    # Support functions
+    def get_application_root() -> Path:
+        # Executed as .exe
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+        # Executed as script
+        return Path(__file__).resolve().parent.parent
+
+    def build_config_path(
+        config_name: str, same_level: bool, app_root: Path
+    ) -> Path:
+        # In case .exe is in the folder of config
+        if same_level:
+            return app_root / config_name
+        
+        return app_root.parent / "config" / config_name
+
+    def load_yaml_config(path: Path) -> dict:
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {path}")
+
+        with path.open("r", encoding="utf-8") as stream:
+            config = yaml.safe_load(stream)
+
+        if not isinstance(config, dict):
+            raise ValueError("Configuration file is not a valid YAML mapping")
+
+        return config
+
+    app_root = get_application_root()
+    config_path = build_config_path(config_name, same_lv, app_root)
+    config = load_yaml_config(config_path)
+    
+    return config
+
+
