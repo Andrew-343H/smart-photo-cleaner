@@ -1,0 +1,20 @@
+cnn:
+  # All classes available
+  classes:
+    - a
+    - b
+    - c
+    - d
+    - e
+    - f
+  # Tell which class CNN should find
+  target_classes:
+    - e
+    - f
+  # CNN displays only top n results
+  top_k: 2
+
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 0.001

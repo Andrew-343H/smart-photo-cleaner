@@ -1,80 +1,22 @@
-import cv2 as cv
-import numpy as np
-from ultralytics import YOLO
-from pathlib import Path
-import matplotlib.pyplot as plt
 from loguru import logger
 
-from utils.utils import fetch_user_dir, found_images_list, add_more, move_to_folder
-
-
-class YoloAnalysis():
-    '''
-    Use Yolo v11 to detect targets in images
-    Args: list of path of images and model
-    ''' 
-    def __init__(self, images_paths: list[Path], model):
-        self.imgs_paths = images_paths
-        self.model = model
-
-    def prediction(
-        self, img_path: Path,
-        id_class: int, conf: float = 0.7, 
-        show: bool = False
-    ) -> bool:
-        '''
-        Open image then detect people using Yolo functions
-        '''
-        img = cv.imread(str(img_path))
-        if img is None:
-            raise ValueError(f"Cannot read image: {img_path}")
-
-        # Take only bbox for person
-        result = self.model(
-            img, conf=conf, classes=[id_class], verbose=False
-        )
-        for r in result:
-            if r.boxes is not None and len(r.boxes) > 0:
-                if show:
-                    logger.info(str(img_path))
-                    img = r.plot()
-                    img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-                    plt.imshow(img)
-                    plt.axis("off")
-                    plt.show()
-                    plt.close()
-                return True
-
-        return False
-    
-
-    def run_analysis(self):
-        '''
-        Core of analysis: apply Yolo to a list of image
-        if img has person, put this one in that list
-        '''
-        
-        # Define number of "target" class 
-        person_class_id = next(
-            k for k, v in self.model.names.items() if v == "person"
-        )
-        logger.info('Using model to detect target')
-        target_list = []
-        for img_path in self.imgs_paths:
-            has_target = self.prediction(
-                img_path, person_class_id, show=False,
-            )
-            if has_target:
-                target_list.append(img_path)
-        logger.success('Classification finished')
-        return target_list
-
+from utils.utils import fetch_user_dir, found_images_list, add_more, move_to_folder, extract_config
+from modules.ai_model import ResNet50
 
 def main():
     filelist = []
     first_folder = None
     selected_dirs = set()
+    imgs_list = []
     
+    # Extract from config the info
+    logger.debug('Find config file..')
+    config = extract_config('config_phcleaner.yaml')
+    class_target = set(config['cnn']['target_classes'])
+    class_names = config['cnn']['classes']
+    topk = config['cnn']['top_k']
+
+    # Section dedicated to find all images path
     while True:
         input_dir = fetch_user_dir("Select main folder")
         if not input_dir:
@@ -93,14 +35,23 @@ def main():
         if not add_more():
             break
 
-    # Find the folder in which is contained the model
-    ROOT = Path(__file__).resolve().parents[1]
-    MODEL_PATH = ROOT / "training_models" / "yolo11x.pt"
+    # Section dedicated to classify images
+    obj = ResNet50(topk=topk)
+    obj.class_names = class_names
+    
+    for img_path in filelist:
+        has_target = False
+        value = obj.predict(img_path)
+        for v in value:
+            if v in class_target:
+                has_target = True
+                break
 
-    model = YOLO(MODEL_PATH)
-    obj = YoloAnalysis(filelist, model)
-    imgs_list = obj.run_analysis()
+        if has_target:
+            imgs_list.append(img_path)
+    logger.success('Classification finished')
 
+    # Section dedicated to move images
     out_title = "Select where the photo will be stored"
     while True:
         out_dir = fetch_user_dir(out_title)
